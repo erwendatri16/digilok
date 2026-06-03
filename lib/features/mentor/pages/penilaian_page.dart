@@ -160,38 +160,6 @@ class _PenilaianPageState extends State<PenilaianPage> {
     ));
   }
 
-  // ================= SIMPAN =================
-  Future<void> simpan() async {
-    if (namaC.text.isEmpty || nimC.text.isEmpty) {
-      _snack("Isi nama dan NIM terlebih dahulu", Colors.red);
-      return;
-    }
-    setState(() => isLoading = true);
-    try {
-      final user = Supabase.instance.client.auth.currentUser;
-      await Supabase.instance.client.from('penilaian').insert({
-        "user_id": user!.id,
-        "nama": namaC.text,
-        "nim": nimC.text,
-        "instansi": instansiC.text,
-        "unit": unitC.text,
-        "periode_mulai": startDate?.toIso8601String(),
-        "periode_selesai": endDate?.toIso8601String(),
-        "pembimbing_lapangan": namaMentor,
-        "pembimbing_akademik": pembAkdC.text,
-        "nilai_akhir": nilaiAkhir * 20,
-        "catatan": {for (var k in catatan.keys) k: catatan[k]!.text},
-      });
-      if (!mounted) return;
-      _snack("Berhasil disimpan", Colors.green);
-    } catch (e) {
-      if (!mounted) return;
-      _snack("Gagal simpan: $e", Colors.red);
-    } finally {
-      if (mounted) setState(() => isLoading = false);
-    }
-  }
-
   // ================= EXPORT PDF =================
   Future<void> exportPdf() async {
     setState(() => isLoading = true);
@@ -584,25 +552,37 @@ class _PenilaianPageState extends State<PenilaianPage> {
   Widget _field(String label, TextEditingController c,
       {bool readOnly = false}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 150,
-            child: Text(label, style: const TextStyle(fontSize: 13)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF555555),
+            ),
           ),
-          const Text(" : "),
-          Expanded(
-            child: TextField(
-              controller: c,
-              readOnly: readOnly,
-              style: const TextStyle(fontSize: 13),
-              decoration: InputDecoration(
-                border: const UnderlineInputBorder(),
-                isDense: true,
-                fillColor: readOnly ? Colors.grey[100] : null,
-                filled: readOnly,
+          const SizedBox(height: 4),
+          TextField(
+            controller: c,
+            readOnly: readOnly,
+            style: const TextStyle(fontSize: 13),
+            decoration: InputDecoration(
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
               ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              isDense: true,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              fillColor: readOnly ? Colors.grey[100] : Colors.white,
+              filled: true,
             ),
           ),
         ],
@@ -612,59 +592,98 @@ class _PenilaianPageState extends State<PenilaianPage> {
 
   Widget _periodeField() {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(
-            width: 150,
-            child: Text("Periode Magang", style: TextStyle(fontSize: 13)),
-          ),
-          const Text(" : "),
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => pickDate(true),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: const BoxDecoration(
-                        border: Border(bottom: BorderSide(color: Colors.grey)),
-                      ),
-                      child: Text(
-                        startDate == null ? "Pilih tanggal mulai" : formatDate(startDate),
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: startDate == null ? Colors.grey : Colors.black,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 6),
-                  child: Text("s/d"),
-                ),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => pickDate(false),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      decoration: const BoxDecoration(
-                        border: Border(bottom: BorderSide(color: Colors.grey)),
-                      ),
-                      child: Text(
-                        endDate == null ? "Pilih tanggal selesai" : formatDate(endDate),
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: endDate == null ? Colors.grey : Colors.black,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+          const Text(
+            "Periode Magang",
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF555555),
             ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => pickDate(true),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.white,
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_today_outlined,
+                            size: 14, color: Color(0xFF6C63FF)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            startDate == null
+                                ? "Tanggal mulai"
+                                : formatDate(startDate),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: startDate == null
+                                  ? Colors.grey
+                                  : Colors.black,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text("s/d",
+                    style: TextStyle(
+                        fontSize: 12, color: Colors.grey.shade600)),
+              ),
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => pickDate(false),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.white,
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_today_outlined,
+                            size: 14, color: Color(0xFF6C63FF)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            endDate == null
+                                ? "Tanggal selesai"
+                                : formatDate(endDate),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: endDate == null
+                                  ? Colors.grey
+                                  : Colors.black,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -673,129 +692,153 @@ class _PenilaianPageState extends State<PenilaianPage> {
 
   Widget _tableUI(Map<String, int> data) {
     int no = 1;
-    return Table(
-      border: TableBorder.all(color: Colors.grey.shade300),
-      // ✅ PERBAIKAN UI: tambah kolom Ket. tersendiri dengan lebar cukup
-      columnWidths: const {
-        0: FixedColumnWidth(36),   // No
-        1: FlexColumnWidth(3),     // Aspek Penilaian
-        2: FixedColumnWidth(190),  // Nilai Radio
-        3: FixedColumnWidth(100),  // ✅ Ket. (lebar cukup untuk "Sangat Kurang")
-        4: FlexColumnWidth(4),     // Catatan
-      },
-      children: [
-        // Header row
-        TableRow(
-          decoration: BoxDecoration(color: Colors.grey[100]),
-          children: const [
-            Padding(
-              padding: EdgeInsets.all(8),
-              child: Text("No",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-            ),
-            Padding(
-              padding: EdgeInsets.all(8),
-              child: Text("Aspek Penilaian",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-            ),
-            Padding(
-              padding: EdgeInsets.all(8),
-              child: Text("Nilai (1 – 5)",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                  textAlign: TextAlign.center),
-            ),
-            // ✅ Header Ket.
-            Padding(
-              padding: EdgeInsets.all(8),
-              child: Text("Ket.",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                  textAlign: TextAlign.center),
-            ),
-            Padding(
-              padding: EdgeInsets.all(8),
-              child: Text("Catatan",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-            ),
-          ],
-        ),
-        ...data.keys.map((k) => TableRow(children: [
-              // No
+    return Column(
+      children: data.keys.map((k) {
+        final currentNo = no++;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Baris atas: nomor + nama aspek + badge ket.
               Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text("${no++}", style: const TextStyle(fontSize: 12)),
-              ),
-              // Aspek Penilaian
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Text(k, style: const TextStyle(fontSize: 12)),
-              ),
-              // Nilai (radio)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF6C63FF).withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        "$currentNo",
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF6C63FF),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        k,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _labelBg(data[k]!),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color:
+                              _labelColor(data[k]!).withValues(alpha: 0.4),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        nilaiLabel(data[k]!),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: _labelColor(data[k]!),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Divider tipis
+              Divider(height: 1, color: Colors.grey.shade200),
+
+              // Baris radio nilai 1–5
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: List.generate(5, (i) {
                     final val = i + 1;
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Radio<int>(
-                          value: val,
-                          groupValue: data[k],
-                          activeColor: const Color(0xFF6C63FF),
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          onChanged: (v) => setState(() => data[k] = v!),
-                        ),
-                        Text("$val", style: const TextStyle(fontSize: 10)),
-                      ],
+                    return Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Radio<int>(
+                            value: val,
+                            groupValue: data[k],
+                            activeColor: const Color(0xFF6C63FF),
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            onChanged: (v) =>
+                                setState(() => data[k] = v!),
+                          ),
+                          Text(
+                            "$val",
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: data[k] == val
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: data[k] == val
+                                  ? const Color(0xFF6C63FF)
+                                  : Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
                     );
                   }),
                 ),
               ),
-              // ✅ Ket. sebagai badge berwarna — rapi & mudah dibaca
+
+              // Catatan (opsional)
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: _labelBg(data[k]!),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: _labelColor(data[k]!).withValues(alpha: 0.4),
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      nilaiLabel(data[k]!),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: _labelColor(data[k]!),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-              ),
-              // Catatan
-              Padding(
-                padding: const EdgeInsets.all(6),
+                padding:
+                    const EdgeInsets.fromLTRB(10, 0, 10, 10),
                 child: TextFormField(
                   controller: catatan[k],
-                  minLines: 2,
-                  maxLines: null,
+                  minLines: 1,
+                  maxLines: 3,
                   style: const TextStyle(fontSize: 12),
-                  decoration: const InputDecoration(
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
                     isDense: true,
-                    hintText: "Opsional...",
-                    hintStyle: TextStyle(fontSize: 11),
+                    hintText: "Catatan (opsional)...",
+                    hintStyle:
+                        TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 8),
+                    filled: true,
+                    fillColor: Colors.white,
                   ),
                 ),
               ),
-            ])),
-      ],
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 
@@ -897,8 +940,8 @@ class _PenilaianPageState extends State<PenilaianPage> {
                     _field("Instansi",        instansiC),
                     _field("Unit / Bidang",  unitC),
                     _periodeField(),
-                    _field("Pemb. Lapangan", pembLapC, readOnly: true),
-                    _field("Pemb. Akademik", pembAkdC),
+                    _field("Pembimbing Lapangan", pembLapC, readOnly: true),
+                    _field("Pembimbing Akademik", pembAkdC),
                   ]),
                 ),
 
@@ -912,10 +955,17 @@ class _PenilaianPageState extends State<PenilaianPage> {
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(color: Colors.amber.shade200),
                   ),
-                  child: const Text(
-                    "Keterangan:  1 = Sangat Kurang  |  2 = Kurang  |  3 = Cukup  |  4 = Baik  |  5 = Sangat Baik",
-                    style: TextStyle(fontSize: 11),
-                    textAlign: TextAlign.center,
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: const [
+                      Text("1 = Sangat Kurang", style: TextStyle(fontSize: 11)),
+                      Text("2 = Kurang",        style: TextStyle(fontSize: 11)),
+                      Text("3 = Cukup",         style: TextStyle(fontSize: 11)),
+                      Text("4 = Baik",          style: TextStyle(fontSize: 11)),
+                      Text("5 = Sangat Baik",   style: TextStyle(fontSize: 11)),
+                    ],
                   ),
                 ),
 
@@ -943,10 +993,10 @@ class _PenilaianPageState extends State<PenilaianPage> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text("NILAI AKHIR : ",
-                          style: TextStyle(color: Colors.white70, fontSize: 14)),
+                      const Text("NILAI AKHIR",
+                          style: TextStyle(color: Colors.white70, fontSize: 13)),
                       Text(
                         "${(nilaiAkhir * 20).toStringAsFixed(1)}  /  100",
                         style: const TextStyle(
@@ -976,10 +1026,12 @@ class _PenilaianPageState extends State<PenilaianPage> {
                 // TOMBOL AKSI
                 Row(
                   children: [
+                    
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: isLoading ? null : exportPdf,
-                        icon: const Icon(Icons.picture_as_pdf_outlined),
+                        icon: const Icon(Icons.picture_as_pdf_outlined,
+                            size: 18),
                         label: const Text("Export PDF"),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF1E3A8A),

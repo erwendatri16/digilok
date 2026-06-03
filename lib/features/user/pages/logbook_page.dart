@@ -48,49 +48,18 @@ class _LogbookPageState
   ) {
     if (!mounted) return;
 
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(
-              isSuccess
-                  ? Icons.check_circle_rounded
-                  : Icons.error_outline_rounded,
-              color: Colors.white,
-            ),
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
 
-            const SizedBox(width: 12),
-
-            Expanded(
-              child: Text(
-                msg,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ],
-        ),
-
-        behavior:
-            SnackBarBehavior.floating,
-
-        backgroundColor: isSuccess
-            ? const Color(0xFF10B981)
-            : Colors.redAccent,
-
-        shape: RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.circular(12),
-        ),
-
-        margin: const EdgeInsets.all(16),
-
-        duration:
-            const Duration(seconds: 3),
+    entry = OverlayEntry(
+      builder: (_) => _FloatingNotification(
+        message: msg,
+        isSuccess: isSuccess,
+        onDone: () => entry.remove(),
       ),
     );
+
+    overlay.insert(entry);
   }
 
   // =====================================================
@@ -1013,6 +982,129 @@ class _LogbookPageState
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// =====================================================
+// FLOATING NOTIFICATION OVERLAY
+// =====================================================
+class _FloatingNotification extends StatefulWidget {
+  final String message;
+  final bool isSuccess;
+  final VoidCallback onDone;
+
+  const _FloatingNotification({
+    required this.message,
+    required this.isSuccess,
+    required this.onDone,
+  });
+
+  @override
+  State<_FloatingNotification> createState() =>
+      _FloatingNotificationState();
+}
+
+class _FloatingNotificationState
+    extends State<_FloatingNotification>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _opacity;
+  late Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+
+    _opacity = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOut,
+    );
+
+    _slide = Tween<Offset>(
+      begin: const Offset(0, -0.3),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOut,
+      ),
+    );
+
+    _controller.forward();
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        _controller.reverse().then((_) => widget.onDone());
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 16,
+      left: 16,
+      right: 16,
+      child: Material(
+        color: Colors.transparent,
+        child: FadeTransition(
+          opacity: _opacity,
+          child: SlideTransition(
+            position: _slide,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              decoration: BoxDecoration(
+                color: widget.isSuccess
+                    ? const Color(0xFF10B981)
+                    : Colors.redAccent,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    widget.isSuccess
+                        ? Icons.check_circle_rounded
+                        : Icons.error_outline_rounded,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      widget.message,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

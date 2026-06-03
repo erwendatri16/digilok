@@ -5,6 +5,7 @@ import '../../user/pages/user_dashboard.dart';
 import '../../mentor/pages/mentor_dashboard.dart';
 import '../../admin/pages/admin_dashboard.dart';
 import 'register_page.dart'; // <--- Sudah di-import aktif di sini
+import '../../../core/widgets/popup_notification.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -44,13 +45,35 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     _animController.forward();
   }
 
+  // =========================================================
+  // CEK MAINTENANCE MODE
+  // =========================================================
+  Future<bool> _isMaintenanceActive() async {
+    try {
+      final data = await Supabase.instance.client
+          .from('system_settings')
+          .select('is_active')
+          .eq('id', 'maintenance_mode')
+          .maybeSingle();
+      return data?['is_active'] ?? false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   Future<void> handleLogin() async {
     if (_emailController.text.trim().isEmpty || _passwordController.text.trim().isEmpty) {
-      showSnackBar("Alamat email dan kata sandi tidak boleh kosong!");
+      PopupNotification.show(
+        context: context,
+        type: PopupType.warning,
+        title: "Form Tidak Lengkap",
+        message: "Alamat email dan kata sandi tidak boleh kosong!",
+      );
       return;
     }
 
     setState(() => isLoading = true);
+
     try {
       final response = await Supabase.instance.client.auth.signInWithPassword(
         email: _emailController.text.trim(),
@@ -70,9 +93,35 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           await Supabase.instance.client.auth.signOut();
           if (mounted) {
             setState(() => isLoading = false);
-            showSnackBar("Akses Ditolak: Akun Admin wajib masuk via Web/Komputer!");
+            PopupNotification.show(
+              context: context,
+              type: PopupType.error,
+              title: "Akses Ditolak",
+              message: "Akun Admin wajib masuk via Web/Komputer!",
+            );
           }
           return;
+        }
+
+        // =========================================================
+        // BLOKIR USER & MENTOR JIKA MAINTENANCE AKTIF
+        // Admin tetap bisa login
+        // =========================================================
+        if (userRole != 'admin') {
+          final maintenance = await _isMaintenanceActive();
+          if (maintenance) {
+            await Supabase.instance.client.auth.signOut();
+            if (mounted) {
+              setState(() => isLoading = false);
+              PopupNotification.show(
+              context: context,
+              type: PopupType.maintenance,
+              title: "Sedang Pemeliharaan",
+              message: "Aplikasi sedang dalam pemeliharaan.\nCoba beberapa saat lagi.",
+            );
+            }
+            return;
+          }
         }
 
         if (!mounted) return;
@@ -92,7 +141,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     } catch (e) {
       if (mounted) {
         setState(() => isLoading = false);
-        showSnackBar("Login Gagal: Periksa kembali email & kata sandi Anda");
+        PopupNotification.show(
+          context: context,
+          type: PopupType.error,
+          title: "Login Gagal",
+          message: "Periksa kembali email & kata sandi Anda.",
+        );
       }
     }
   }
