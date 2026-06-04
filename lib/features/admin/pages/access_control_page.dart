@@ -37,17 +37,25 @@ class _AccessControlPageState extends State<AccessControlPage> {
     }
   }
 
-  Future<void> toggleMaintenanceMode(bool newValue) async {
-    setState(() => isMaintenanceMode = newValue);
-    try {
-      await supabase.from('system_settings').update({'is_active': newValue}).eq('id', 'maintenance_mode');
-      await insertAuditLog('MAINTENANCE', newValue ? 'Mengaktifkan Maintenance Mode' : 'Menonaktifkan Maintenance Mode');
-      showSnackBar(newValue ? "Mode Pemeliharaan Aktif!" : "Sistem Kembali Normal.");
-    } catch (e) {
-      showSnackBar("Error: $e", isError: true);
-      setState(() => isMaintenanceMode = !newValue);
-    }
+Future<void> toggleMaintenanceMode(bool newValue) async {
+  try {
+    await supabase
+        .from('system_settings')
+        .update({'is_active': newValue})
+        .eq('id', 'maintenance_mode');
+
+    // Ambil ulang dari database
+    await fetchMaintenanceStatus();
+
+    showSnackBar(
+      newValue
+          ? "Mode Pemeliharaan Aktif!"
+          : "Mode Pemeliharaan Nonaktif!",
+    );
+  } catch (e) {
+    showSnackBar("Error: $e", isError: true);
   }
+}
 
   Future<void> fetchAccessData() async {
     setState(() => isLoading = true);

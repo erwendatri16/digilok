@@ -64,7 +64,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     }
 
     try {
-      final logbookLog = await supabase.from('logbooks').select('id').eq('tanggal', hariIni);
+      final logbookLog = await supabase.from('logbook').select('id').eq('tanggal', hariIni);
       logbookCount = logbookLog.length;
     } catch (e) {
       debugPrint("Logbook error: $e");
