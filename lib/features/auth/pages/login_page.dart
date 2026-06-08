@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../user/pages/user_dashboard.dart';
 import '../../mentor/pages/mentor_dashboard.dart';
 import '../../admin/pages/admin_dashboard.dart';
-import 'register_page.dart'; // <--- Sudah di-import aktif di sini
+import 'register_page.dart';
 import '../../../core/widgets/popup_notification.dart';
 
 class LoginPage extends StatefulWidget {
@@ -20,7 +20,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   bool isLoading = false;
   bool isPasswordVisible = false;
 
-  // Controller animasi untuk memunculkan elemen form secara berurutan (Staggered Fade-In)
   late AnimationController _animController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -41,7 +40,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
     );
 
-    // Jalankan animasi form masuk begitu halaman dimuat
     _animController.forward();
   }
 
@@ -89,6 +87,28 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
         final String userRole = data['role'] ?? 'user';
 
+        // =========================================================
+        // CEK STATUS AKUN — BLOKIR JIKA is_active = false
+        // Dicek paling awal sebelum apapun
+        // =========================================================
+        final bool isActive = data['is_active'] ?? true;
+        if (!isActive) {
+          await Supabase.instance.client.auth.signOut();
+          if (mounted) {
+            setState(() => isLoading = false);
+            PopupNotification.show(
+              context: context,
+              type: PopupType.error,
+              title: "Akun Diblokir",
+              message: "Akun Anda telah diblokir oleh admin.\nHubungi admin untuk informasi lebih lanjut.",
+            );
+          }
+          return;
+        }
+
+        // =========================================================
+        // BLOKIR ADMIN JIKA LOGIN VIA HP (BUKAN WEB)
+        // =========================================================
         if (userRole == 'admin' && !kIsWeb) {
           await Supabase.instance.client.auth.signOut();
           if (mounted) {
@@ -114,11 +134,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             if (mounted) {
               setState(() => isLoading = false);
               PopupNotification.show(
-              context: context,
-              type: PopupType.maintenance,
-              title: "Sedang Pemeliharaan",
-              message: "Aplikasi sedang dalam pemeliharaan.\nCoba beberapa saat lagi.",
-            );
+                context: context,
+                type: PopupType.maintenance,
+                title: "Sedang Pemeliharaan",
+                message: "Aplikasi sedang dalam pemeliharaan.\nCoba beberapa saat lagi.",
+              );
             }
             return;
           }
@@ -156,7 +176,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       SnackBar(
         content: Text(msg, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: const Color(0xFFEF4444), // Crimson Red modern
+        backgroundColor: const Color(0xFFEF4444),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       ),
     );
@@ -179,9 +199,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Color(0xFF1E1B4B), // Deep Slate Navy
-              Color(0xFF312E81), // Dark Indigo
-              Color(0xFF4338CA), // Electric Indigo
+              Color(0xFF1E1B4B),
+              Color(0xFF312E81),
+              Color(0xFF4338CA),
             ],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -199,7 +219,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     width: kIsWeb ? 420 : double.infinity,
                     padding: const EdgeInsets.all(32),
                     decoration: BoxDecoration(
-                      color: Colors.white.withAlpha(240), // Putih susu semi transparan mewah
+                      color: Colors.white.withAlpha(240),
                       borderRadius: BorderRadius.circular(32),
                       boxShadow: [
                         BoxShadow(
@@ -213,7 +233,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // ===== LOGO IMAGE KUSTOM =====
+                        // ===== LOGO =====
                         Center(
                           child: Container(
                             height: 100,
@@ -242,8 +262,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           "DIGILOK",
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 26, 
-                            fontWeight: FontWeight.w900, 
+                            fontSize: 26,
+                            fontWeight: FontWeight.w900,
                             color: Color(0xFF1E1B4B),
                             letterSpacing: 0.5,
                           ),
@@ -253,14 +273,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           "Sistem Absensi & Logbook Digital",
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 13, 
+                            fontSize: 13,
                             color: const Color(0xFF1E1B4B).withAlpha(150),
                             fontWeight: FontWeight.w500,
                           ),
                         ),
                         const SizedBox(height: 36),
 
-                        // ===== KOLOM EMAIL =====
+                        // ===== EMAIL =====
                         TextField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
@@ -284,7 +304,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                         ),
                         const SizedBox(height: 18),
 
-                        // ===== KOLOM PASSWORD =====
+                        // ===== PASSWORD =====
                         TextField(
                           controller: _passwordController,
                           obscureText: !isPasswordVisible,
@@ -330,12 +350,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                   child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
                                 )
                               : const Text(
-                                  "Masuk", 
+                                  "Masuk",
                                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.0),
                                 ),
                         ),
 
-                        // ===== TOMBOL MENU REGISTER (SUDAH AKTIF JALUR NAVIGASINYA) =====
+                        // ===== REGISTER =====
                         const SizedBox(height: 24),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
