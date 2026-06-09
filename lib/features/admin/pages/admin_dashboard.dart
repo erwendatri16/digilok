@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../auth/pages/splash_page.dart'; 
 import 'user_management_page.dart';
 import 'access_control_page.dart';
+import '../../internship/pages/internship_dashboard_page.dart';
 
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({super.key});
@@ -176,9 +177,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   const SizedBox(height: 32),
 
                   // LIVE AUDIT LOG MONITORING SYSTEM (REALTIME STREAM)
-                  const Text(
-                    "Live Audit Log Sistem (Realtime)",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  Row(
+                    children: [
+                      const Text(
+                        "Live Audit Log Sistem (Realtime)",
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      ),
+                      const SizedBox(width: 10),
+                      // Indikator titik hijau berkedip tanda realtime aktif
+                      _RealtimePulseDot(),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   
@@ -190,13 +198,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: StreamBuilder<List<Map<String, dynamic>>>(
-                      stream: supabase.from('audit_logs').stream(primaryKey: ['id']).order('created_at', ascending: false).limit(20),
+                      stream: supabase
+                          .from('audit_logs')
+                          .stream(primaryKey: ['id'])
+                          .gte('created_at', DateTime.now().toIso8601String().substring(0, 10)) // Filter hanya hari ini
+                          .order('created_at', ascending: false)
+                          .limit(50),
                       builder: (context, snapshot) {
                         if (snapshot.hasError) return const Center(child: Text("Gagal memuat log sistem."));
                         if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: Color(0xFF6C63FF)));
                         
                         final logs = snapshot.data ?? [];
-                        if (logs.isEmpty) return const Center(child: Text("Belum ada riwayat tercatat hari ini.", style: TextStyle(color: Colors.grey)));
+                        if (logs.isEmpty) return const Center(child: Text("Belum ada aktivitas tercatat hari ini.", style: TextStyle(color: Colors.grey)));
 
                         return ListView.separated(
                           itemCount: logs.length,
@@ -268,7 +281,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       height: double.infinity,
       color: const Color(0xFF1E1B4B),
       child: Column(
-        children: [
+        children: <Widget>[
           const SizedBox(height: 32),
           const Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -290,6 +303,11 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             if (isInsideDrawer) Navigator.pop(context);
             Navigator.push(context, MaterialPageRoute(builder: (_) => const AccessControlPage()));
           }),
+          _sidebarItem(Icons.school_rounded, "Manajemen Magang", false, () {
+            if (isInsideDrawer) Navigator.pop(context);
+            Navigator.push(context, MaterialPageRoute(builder: (_) => const InternshipDashboardPage()));
+          }),
+          
           const Spacer(),
           _sidebarItem(Icons.logout_rounded, "Keluar Sistem", false, handleLogout, isDanger: true),
           const SizedBox(height: 24),
@@ -299,6 +317,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   // ================= UTILITY BUILDER: RESPONSIVE STAT CARDS GRID =================
+
   Widget _buildResponsiveStats(double width) {
     var cards = [
       _statCard("Total Siswa", totalUsers.toString(), Icons.people_alt_rounded, Colors.blue),
@@ -368,6 +387,48 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
             ),
           )
         ],
+      ),
+    );
+  }
+}
+// ================= WIDGET TERPISAH: INDIKATOR TITIK HIJAU REALTIME =================
+class _RealtimePulseDot extends StatefulWidget {
+  @override
+  State<_RealtimePulseDot> createState() => _RealtimePulseDotState();
+}
+
+class _RealtimePulseDotState extends State<_RealtimePulseDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _animation = Tween<double>(begin: 0.3, end: 1.0).animate(_controller);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _animation,
+      child: Container(
+        width: 10,
+        height: 10,
+        decoration: const BoxDecoration(
+          color: Colors.green,
+          shape: BoxShape.circle,
+        ),
       ),
     );
   }
