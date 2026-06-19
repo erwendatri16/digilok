@@ -21,9 +21,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   
   int totalUsers = 0;
   int totalMentors = 0;
-  int totalAdmins = 0;
   int totalAbsensiHariIni = 0;
   int totalLogbookHariIni = 0;
+  int totalPendingMagang = 0; // State pending pengajuan magang
+  int totalAdmins = 0;
   bool isStatsLoading = true;
 
   @override
@@ -42,6 +43,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     int adminsCount = 0;
     int absensiCount = 0;
     int logbookCount = 0;
+    int pendingMagangCount = 0;
 
     try {
       final usersData = await supabase.from('users').select('role');
@@ -71,6 +73,16 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       debugPrint("Logbook error: $e");
     }
 
+    try {
+      final pendingMagangLog = await supabase
+          .from('pengajuan_magang') // Sesuaikan nama tabel pengajuan magang di Supabase Anda
+          .select('id')
+          .eq('status', 'pending');
+      pendingMagangCount = pendingMagangLog.length;
+    } catch (e) {
+      debugPrint("Pending Magang error: $e");
+    }
+
     if (mounted) {
       setState(() {
         totalUsers = usersCount;
@@ -78,6 +90,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
         totalAdmins = adminsCount;
         totalAbsensiHariIni = absensiCount;
         totalLogbookHariIni = logbookCount;
+        totalPendingMagang = pendingMagangCount;
         isStatsLoading = false;
       });
     }
@@ -85,21 +98,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   // ================= PROSES LOGOUT FIX TOTAL (ANTI-BLANK SCREEN) =================
   Future<void> handleLogout() async {
-    // 1. Jika Drawer di HP/Tablet sedang terbuka, tutup dulu agar navigasi lancar
     if (_scaffoldKey.currentState?.isDrawerOpen ?? false) {
       Navigator.pop(context);
     }
 
     try {
-      // 2. Putus hubungan sesi token login di database Supabase pusat
       await supabase.auth.signOut();
       
-      // 3. Kembalikan secara fisik ke SplashPage sebagai gerbang pengecekan auth utama aplikasi
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const SplashPage()),
-          (route) => false, // Hapus bersih tumpukan halaman agar tidak bisa di-back fisik
+          (route) => false,
         );
       }
     } catch (e) {
@@ -110,13 +120,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
-    bool isDesktop = screenWidth >= 1024; // Detektor ukuran monitor PC/Laptop
+    bool isDesktop = screenWidth >= 1024;
 
     return Scaffold(
-      key: _scaffoldKey, // Pasangkan key penutup drawer di sini
+      key: _scaffoldKey,
       backgroundColor: const Color(0xFFF8FAFC),
       
-      // Munculkan AppBar & tombol hamburger menu jika dibuka di HP / Tablet
       appBar: isDesktop
           ? null
           : AppBar(
@@ -129,15 +138,12 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
               ),
             ),
             
-      // Sisi Sidebar otomatis melipat masuk menjadi Drawer geser di HP
       drawer: !isDesktop ? _buildSidebar(isInsideDrawer: true) : null,
       
       body: Row(
         children: [
-          // Jika layar Desktop monitor lebar, tampilkan Sidebar permanen di sisi kiri
           if (isDesktop) _buildSidebar(isInsideDrawer: false),
 
-          // Konten Utama Dashboard Utama (Sisi Kanan)
           Expanded(
             child: SingleChildScrollView(
               padding: EdgeInsets.all(screenWidth < 600 ? 16.0 : 40.0),
@@ -184,14 +190,13 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                       ),
                       const SizedBox(width: 10),
-                      // Indikator titik hijau berkedip tanda realtime aktif
                       _RealtimePulseDot(),
                     ],
                   ),
                   const SizedBox(height: 16),
                   
                   Container(
-                    height: 450, // Batasan tinggi container audit log agar nyaman di-scroll di HP
+                    height: 450,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
@@ -201,7 +206,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                       stream: supabase
                           .from('audit_logs')
                           .stream(primaryKey: ['id'])
-                          .gte('created_at', DateTime.now().toIso8601String().substring(0, 10)) // Filter hanya hari ini
+                          .gte('created_at', DateTime.now().toIso8601String().substring(0, 10))
                           .order('created_at', ascending: false)
                           .limit(50),
                       builder: (context, snapshot) {
@@ -317,36 +322,31 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   }
 
   // ================= UTILITY BUILDER: RESPONSIVE STAT CARDS GRID =================
-
   Widget _buildResponsiveStats(double width) {
     var cards = [
       _statCard("Total Siswa", totalUsers.toString(), Icons.people_alt_rounded, Colors.blue),
       _statCard("Total Mentor", totalMentors.toString(), Icons.school_rounded, Colors.orange),
       _statCard("Absen Hari Ini", totalAbsensiHariIni.toString(), Icons.co_present_rounded, Colors.green),
       _statCard("Logbook Masuk", totalLogbookHariIni.toString(), Icons.menu_book_rounded, Colors.purple),
+      _statCard("Pending Magang", totalPendingMagang.toString(), Icons.pending_actions_rounded, Colors.red),
     ];
 
     if (width < 600) {
-      // Tampilan HP Tegak: Menurun Vertikal Satu per Satu
+      // HP: Susunan menurun vertikal satu per satu
       return Column(children: cards.map((c) => Padding(padding: const EdgeInsets.only(bottom: 12), child: c)).toList());
-    } else if (width < 1024) {
-      // Tampilan Tablet: Grid Kotak 2 Kolom Kiri Kanan
+    } else if (width < 1300) {
+      // Tablet & Desktop Standar: Dibagi menjadi susunan 2 baris agar teks leluasa dan tidak overflow
       return Column(
         children: [
-          Row(children: [Expanded(child: cards[0]), const SizedBox(width: 12), Expanded(child: cards[1])]),
-          const SizedBox(height: 12),
-          Row(children: [Expanded(child: cards[2]), const SizedBox(width: 12), Expanded(child: cards[3])]),
+          Row(children: [Expanded(child: cards[0]), const SizedBox(width: 16), Expanded(child: cards[1]), const SizedBox(width: 16), Expanded(child: cards[2])]),
+          const SizedBox(height: 16),
+          Row(children: [Expanded(child: cards[3]), const SizedBox(width: 16), Expanded(child: cards[4]), const SizedBox(width: 16), const Spacer()]),
         ],
       );
     } else {
-      // Tampilan Monitor PC Desktop: Melebar Sejajar Horizontal Sekaligus
+      // Desktop Layar Lebar: Dijajarkan sejajar horizontal sekaligus jika ruang sangat luas
       return Row(
-        children: [
-          Expanded(child: cards[0]), const SizedBox(width: 16),
-          Expanded(child: cards[1]), const SizedBox(width: 16),
-          Expanded(child: cards[2]), const SizedBox(width: 16),
-          Expanded(child: cards[3]),
-        ],
+        children: cards.map((c) => Expanded(child: Padding(padding: const EdgeInsets.only(right: 12), child: c))).toList(),
       );
     }
   }
@@ -366,7 +366,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   Widget _statCard(String label, String value, IconData icon, Color color) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -375,12 +375,18 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       child: Row(
         children: [
           CircleAvatar(radius: 22, backgroundColor: color.withAlpha(20), child: Icon(icon, color: color, size: 22)),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w500), overflow: TextOverflow.ellipsis),
+                Text(
+                  label, 
+                  style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w500),
+                  softWrap: true, // Izinkan teks turun ke bawah jika ruang menyempit
+                  maxLines: 2,    // Batasi maksimum 2 baris agar tetap rapi
+                ),
                 const SizedBox(height: 4),
                 Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
               ],
@@ -391,6 +397,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     );
   }
 }
+
 // ================= WIDGET TERPISAH: INDIKATOR TITIK HIJAU REALTIME =================
 class _RealtimePulseDot extends StatefulWidget {
   @override

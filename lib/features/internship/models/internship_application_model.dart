@@ -11,6 +11,7 @@ class InternshipApplication {
   final String? urlSuratPengantar;
   final String? urlKtm;
   final String? urlCv;
+  final String? urlSuratBalasan;
   final String status;
   final String? alasanPenolakan;
   final DateTime? createdAt;
@@ -30,6 +31,7 @@ class InternshipApplication {
     this.urlSuratPengantar,
     this.urlKtm,
     this.urlCv,
+    this.urlSuratBalasan,
     required this.status,
     this.alasanPenolakan,
     this.createdAt,
@@ -58,6 +60,7 @@ class InternshipApplication {
           json['url_surat_pengantar'],
       urlKtm: json['url_ktm'],
       urlCv: json['url_cv'],
+      urlSuratBalasan: json['url_surat_balasan'],
       status: json['status'] ?? 'pending',
       alasanPenolakan:
           json['alasan_penolakan'],
@@ -92,6 +95,7 @@ class InternshipApplication {
           urlSuratPengantar,
       'url_ktm': urlKtm,
       'url_cv': urlCv,
+      'url_surat_balasan': urlSuratBalasan,
       'status': status,
       'alasan_penolakan':
           alasanPenolakan,

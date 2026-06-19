@@ -64,6 +64,7 @@ class InternshipRepository {
   Future<void> approveApplication({
     required String applicationId,
     required String reviewerId,
+    String? urlSuratBalasan,
   }) async {
     await supabase
         .from('internship_applications')
@@ -73,6 +74,8 @@ class InternshipRepository {
       'reviewed_at':
           DateTime.now()
               .toIso8601String(),
+      if (urlSuratBalasan != null)
+        'url_surat_balasan': urlSuratBalasan,
     }).eq('id', applicationId);
   }
 

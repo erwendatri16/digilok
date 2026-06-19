@@ -1,4 +1,8 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/internship_application_model.dart';
 import '../repositories/internship_repository.dart';
@@ -92,43 +96,23 @@ class _InternshipManagementPageState
     final reviewerId = _repository.supabase.auth.currentUser?.id ?? '';
 
     if (newStatus == 'diterima') {
-      final confirm = await showDialog<bool>(
+      final result = await showDialog<_MgmtTerimaResult>(
         context: context,
-        builder: (ctx) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(width: 8),
-            const Text('Terima Pengajuan',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          ]),
-          content: Text(
-              'Yakin ingin menerima pengajuan dari ${item.namaLengkap}?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Batal', style: TextStyle(color: _kTextSub)),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: color,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Terima'),
-            ),
-          ],
-        ),
+        barrierDismissible: false,
+        builder: (ctx) => _MgmtTerimaDialog(namaLengkap: item.namaLengkap),
       );
-      if (confirm != true) return;
+      if (result == null) return;
 
       try {
+        String? urlSuratBalasan;
+        if (result.file != null) {
+          urlSuratBalasan =
+              await _uploadSuratBalasan(item.id, result.file!);
+        }
         await _repository.approveApplication(
           applicationId: item.id,
           reviewerId: reviewerId,
+          urlSuratBalasan: urlSuratBalasan,
         );
       } catch (e) {
         if (!mounted) return;
@@ -230,6 +214,25 @@ class _InternshipManagementPageState
       ),
     );
     await loadData();
+  }
+
+  // ── UPLOAD SURAT BALASAN ──────────────────────────────────────────────────
+
+  Future<String?> _uploadSuratBalasan(
+      String applicationId, PlatformFile file) async {
+    final bytes = file.bytes ?? await File(file.path!).readAsBytes();
+    final ext = file.extension ?? 'pdf';
+    final fileName =
+        'surat_balasan_${applicationId}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+
+    await _repository.supabase.storage
+        .from('surat-balasan')
+        .uploadBinary(fileName, bytes,
+            fileOptions: FileOptions(contentType: 'application/$ext'));
+
+    return _repository.supabase.storage
+        .from('surat-balasan')
+        .getPublicUrl(fileName);
   }
 
   // ── HELPERS ───────────────────────────────────────────────────────────────
@@ -334,67 +337,79 @@ class _InternshipManagementPageState
 
           const SizedBox(height: 12),
 
-          // ── STATUS CHIP TABS ──────────────────────────────────────────
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+          // ── STATUS CHIP TABS (FIXED: SEIMBANG BAGI RATA 4 KOLOM) ──────
+          Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
+              // Setiap item dalam status list akan dibungkus Expanded secara adil
               children: _statusTabs.map((status) {
                 final isSelected = selectedStatus == status;
                 final color = _statusColor(status);
-                return GestureDetector(
-                  onTap: () {
-                    setState(() => selectedStatus = status);
-                    filterData();
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    margin: const EdgeInsets.only(right: 10),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 9),
-                    decoration: BoxDecoration(
-                      color: isSelected ? color : _kCardBg,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: isSelected ? color : _kBorder),
+                
+                return Expanded(
+                  child: Container(
+                    // Memberi margin kanan ke semua item kecuali item terakhir agar pas di layout layar
+                    margin: EdgeInsets.only(
+                      right: status == _statusTabs.last ? 0 : 8,
                     ),
-                    child: Row(
-                      children: [
-                        Icon(_statusIcon(status),
-                            size: 14,
-                            color: isSelected ? Colors.white : color),
-                        const SizedBox(width: 6),
-                        Text(
-                          _statusLabel(status),
-                          style: TextStyle(
-                            color:
-                                isSelected ? Colors.white : _kTextSub,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                            fontSize: 13,
-                          ),
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() => selectedStatus = status);
+                        filterData();
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                        decoration: BoxDecoration(
+                          color: isSelected ? color : _kCardBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: isSelected ? color : _kBorder),
                         ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? Colors.white.withValues(alpha: 0.25)
-                                : color.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            '${_countByStatus(status)}',
-                            style: TextStyle(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _statusIcon(status),
+                              size: 13,
                               color: isSelected ? Colors.white : color,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
                             ),
-                          ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                _statusLabel(status),
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : _kTextSub,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  fontSize: 12,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.white.withValues(alpha: 0.25)
+                                    : color.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                '${_countByStatus(status)}',
+                                style: TextStyle(
+                                  color: isSelected ? Colors.white : color,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 );
@@ -462,7 +477,6 @@ class _InternshipManagementPageState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Baris atas: avatar + info + badge ──
                 Row(
                   children: [
                     CircleAvatar(
@@ -503,8 +517,6 @@ class _InternshipManagementPageState
                     ),
                   ],
                 ),
-
-                // ── Tombol aksi (pending only) ──
                 if (item.status == 'pending') ...[
                   const SizedBox(height: 12),
                   const Divider(height: 1, color: _kBorder),
@@ -587,6 +599,200 @@ class _InternshipManagementPageState
           ),
         ],
       ),
+    );
+  }
+}
+
+// =============================================================================
+// DATA CLASS — hasil dialog terima
+// =============================================================================
+class _MgmtTerimaResult {
+  final PlatformFile? file;
+  const _MgmtTerimaResult({this.file});
+}
+
+// =============================================================================
+// DIALOG TERIMA — stateful dengan upload surat balasan
+// =============================================================================
+class _MgmtTerimaDialog extends StatefulWidget {
+  final String namaLengkap;
+  const _MgmtTerimaDialog({required this.namaLengkap});
+
+  @override
+  State<_MgmtTerimaDialog> createState() => _MgmtTerimaDialogState();
+}
+
+class _MgmtTerimaDialogState extends State<_MgmtTerimaDialog> {
+  PlatformFile? _file;
+
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'doc', 'docx'],
+      withData: true,
+    );
+    if (result != null && result.files.isNotEmpty) {
+      setState(() => _file = result.files.first);
+    }
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Row(
+        children: [
+          Icon(Icons.check_circle_rounded, color: _kColorDiterima, size: 22),
+          SizedBox(width: 8),
+          Text('Terima Pengajuan',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Yakin menerima pengajuan dari ${widget.namaLengkap}?',
+              style: const TextStyle(fontSize: 13, color: _kTextPrimary),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Surat Balasan (opsional)',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _kTextPrimary),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Upload surat balasan/penerimaan untuk peserta magang.',
+              style: TextStyle(fontSize: 12, color: _kTextSub),
+            ),
+            const SizedBox(height: 10),
+            if (_file == null)
+              GestureDetector(
+                onTap: _pickFile,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  decoration: BoxDecoration(
+                    color: _kColorDiterima.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: _kColorDiterima.withValues(alpha: 0.3)),
+                  ),
+                  child: const Column(
+                    children: [
+                      Icon(Icons.upload_file_rounded,
+                          color: _kColorDiterima, size: 28),
+                      SizedBox(height: 6),
+                      Text('Tap untuk pilih file',
+                          style: TextStyle(
+                              color: _kColorDiterima,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600)),
+                      SizedBox(height: 2),
+                      Text('PDF, DOC, DOCX',
+                          style:
+                              TextStyle(color: _kTextSub, fontSize: 11)),
+                    ],
+                  ),
+                ),
+              )
+            else
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _kColorDiterima.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: _kColorDiterima.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _kColorDiterima.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.insert_drive_file_rounded,
+                          color: _kColorDiterima, size: 22),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _file!.name,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _kTextPrimary),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _file!.size > 0
+                                ? _formatBytes(_file!.size)
+                                : 'Ukuran tidak diketahui',
+                            style: const TextStyle(
+                                fontSize: 11, color: _kTextSub),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: _pickFile,
+                      icon: const Icon(Icons.swap_horiz_rounded,
+                          color: _kAccent, size: 18),
+                      tooltip: 'Ganti file',
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.all(4),
+                    ),
+                    IconButton(
+                      onPressed: () => setState(() => _file = null),
+                      icon: const Icon(Icons.close_rounded,
+                          color: _kColorDitolak, size: 18),
+                      tooltip: 'Hapus file',
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.all(4),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Batal', style: TextStyle(color: _kTextSub)),
+        ),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _kColorDiterima,
+            foregroundColor: Colors.white,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          onPressed: () =>
+              Navigator.pop(context, _MgmtTerimaResult(file: _file)),
+          icon: const Icon(Icons.check_rounded, size: 16),
+          label: const Text('Terima'),
+        ),
+      ],
     );
   }
 }

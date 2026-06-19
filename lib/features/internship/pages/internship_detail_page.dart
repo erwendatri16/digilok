@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 
 import '../models/internship_application_model.dart';
 import '../repositories/internship_repository.dart';
+
 
 // ===========================================================================
 // COLOR TOKENS
@@ -69,63 +71,61 @@ class _InternshipDetailPageState extends State<InternshipDetailPage> {
     }
   }
 
-  Future<void> _openUrl(String? url) async {
-    if (url == null || url.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('URL dokumen tidak tersedia')),
-      );
-      return;
-    }
-    final uri = Uri.parse(url);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tidak dapat membuka dokumen')),
-      );
-    }
+void _openDocument(String? url, String label) async {
+  if (url == null || url.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('URL dokumen tidak tersedia')),
+    );
+    return;
   }
 
-  // ── AKSI TERIMA ──────────────────────────────────────────────────────────
+  await launchUrl(
+    Uri.parse(url),
+    mode: LaunchMode.externalApplication,
+  );
+}
+
+  // ── UPLOAD SURAT BALASAN ─────────────────────────────────────────────────
+
+  Future<String?> _uploadSuratBalasan(PlatformFile file) async {
+  final bytes = file.bytes!;
+    final ext = file.extension ?? 'pdf';
+    final fileName =
+        'surat_balasan_${item.id}_${DateTime.now().millisecondsSinceEpoch}.$ext';
+
+    await Supabase.instance.client.storage
+        .from('surat-balasan')
+        .uploadBinary(fileName, bytes,
+            fileOptions: FileOptions(contentType: 'application/$ext'));
+
+    return Supabase.instance.client.storage
+        .from('surat-balasan')
+        .getPublicUrl(fileName);
+  }
+
+  // ── DIALOG TERIMA (dengan upload surat balasan) ──────────────────────────
 
   Future<void> _handleTerima() async {
-    final confirm = await showDialog<bool>(
+    final pickedFile = await showDialog<_TerimaResult>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.check_circle_rounded, color: _kColorDiterima, size: 22),
-            SizedBox(width: 8),
-            Text('Terima Pengajuan',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Text('Yakin ingin menerima pengajuan dari ${item.namaLengkap}?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Batal', style: TextStyle(color: _kTextSub)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _kColorDiterima,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Terima'),
-          ),
-        ],
-      ),
+      barrierDismissible: false,
+      builder: (ctx) => _TerimaDialog(namaLengkap: item.namaLengkap),
     );
-    if (confirm != true) return;
+
+    if (pickedFile == null) return; // Batal
 
     setState(() => _isProcessing = true);
     try {
+      String? urlSuratBalasan;
+      if (pickedFile.file != null) {
+        urlSuratBalasan = await _uploadSuratBalasan(pickedFile.file!);
+      }
+
       final reviewerId = Supabase.instance.client.auth.currentUser?.id ?? '';
       await _repository.approveApplication(
         applicationId: item.id,
         reviewerId: reviewerId,
+        urlSuratBalasan: urlSuratBalasan,
       );
       if (!mounted) return;
       setState(() {
@@ -142,6 +142,7 @@ class _InternshipDetailPageState extends State<InternshipDetailPage> {
           urlSuratPengantar: item.urlSuratPengantar,
           urlKtm: item.urlKtm,
           urlCv: item.urlCv,
+          urlSuratBalasan: urlSuratBalasan,
           status: 'diterima',
           alasanPenolakan: item.alasanPenolakan,
           createdAt: item.createdAt,
@@ -165,6 +166,7 @@ class _InternshipDetailPageState extends State<InternshipDetailPage> {
     }
     setState(() => _isProcessing = false);
   }
+
 
   // ── AKSI TOLAK ───────────────────────────────────────────────────────────
 
@@ -503,6 +505,13 @@ class _InternshipDetailPageState extends State<InternshipDetailPage> {
                   label: 'Curriculum Vitae',
                   url: item.urlCv,
                 ),
+                if (item.status == 'diterima')
+                  _buildDocRow(
+                    icon: Icons.mark_email_read_rounded,
+                    label: 'Surat Balasan',
+                    url: item.urlSuratBalasan,
+                    accent: _kColorDiterima,
+                  ),
               ],
             ),
 
@@ -599,8 +608,10 @@ class _InternshipDetailPageState extends State<InternshipDetailPage> {
     required IconData icon,
     required String label,
     required String? url,
+    Color? accent,
   }) {
     final bool available = url != null && url.isNotEmpty;
+    final Color activeColor = accent ?? _kAccent;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -613,13 +624,13 @@ class _InternshipDetailPageState extends State<InternshipDetailPage> {
                 style: const TextStyle(color: _kTextPrimary, fontSize: 13)),
           ),
           GestureDetector(
-            onTap: available ? () => _openUrl(url) : null,
+            onTap: available ? () => _openDocument(url, label) : null,
             child: Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: available
-                    ? _kAccent.withValues(alpha: 0.10)
+                    ? activeColor.withValues(alpha: 0.10)
                     : _kBorder,
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -631,13 +642,13 @@ class _InternshipDetailPageState extends State<InternshipDetailPage> {
                         ? Icons.open_in_new_rounded
                         : Icons.block_rounded,
                     size: 13,
-                    color: available ? _kAccent : _kTextSub,
+                    color: available ? activeColor : _kTextSub,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     available ? 'Buka' : 'Tidak ada',
                     style: TextStyle(
-                        color: available ? _kAccent : _kTextSub,
+                        color: available ? activeColor : _kTextSub,
                         fontSize: 12,
                         fontWeight: FontWeight.bold),
                   ),
@@ -647,6 +658,212 @@ class _InternshipDetailPageState extends State<InternshipDetailPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// =============================================================================
+// DATA CLASS — hasil dialog terima
+// =============================================================================
+class _TerimaResult {
+  final PlatformFile? file;
+  const _TerimaResult({this.file});
+}
+
+// =============================================================================
+// DIALOG TERIMA — stateful, berisi upload + preview surat balasan
+// =============================================================================
+class _TerimaDialog extends StatefulWidget {
+  final String namaLengkap;
+  const _TerimaDialog({required this.namaLengkap});
+
+  @override
+  State<_TerimaDialog> createState() => _TerimaDialogState();
+}
+
+class _TerimaDialogState extends State<_TerimaDialog> {
+  PlatformFile? _file;
+
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'doc', 'docx'],
+      withData: true,
+    );
+    if (result != null && result.files.isNotEmpty) {
+      setState(() => _file = result.files.first);
+    }
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Row(
+        children: [
+          Icon(Icons.check_circle_rounded, color: _kColorDiterima, size: 22),
+          SizedBox(width: 8),
+          Text('Terima Pengajuan',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Yakin menerima pengajuan dari ${widget.namaLengkap}?',
+              style: const TextStyle(fontSize: 13, color: _kTextPrimary),
+            ),
+            const SizedBox(height: 16),
+
+            // ── UPLOAD SURAT BALASAN ─────────────────────────────────────
+            const Text(
+              'Surat Balasan (opsional)',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _kTextPrimary),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Upload surat balasan/penerimaan untuk peserta magang.',
+              style: TextStyle(fontSize: 12, color: _kTextSub),
+            ),
+            const SizedBox(height: 10),
+
+            // Area upload
+            if (_file == null)
+              GestureDetector(
+                onTap: _pickFile,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  decoration: BoxDecoration(
+                    color: _kColorDiterima.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _kColorDiterima.withValues(alpha: 0.3),
+                      style: BorderStyle.solid,
+                    ),
+                  ),
+                  child: const Column(
+                    children: [
+                      Icon(Icons.upload_file_rounded,
+                          color: _kColorDiterima, size: 28),
+                      SizedBox(height: 6),
+                      Text(
+                        'Tap untuk pilih file',
+                        style: TextStyle(
+                            color: _kColorDiterima,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'PDF, DOC, DOCX',
+                        style: TextStyle(color: _kTextSub, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              // Preview file yang sudah dipilih
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _kColorDiterima.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                      color: _kColorDiterima.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _kColorDiterima.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.insert_drive_file_rounded,
+                          color: _kColorDiterima, size: 22),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _file!.name,
+                            style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _kTextPrimary),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _file!.size > 0
+                                ? _formatBytes(_file!.size)
+                                : 'Ukuran tidak diketahui',
+                            style: const TextStyle(
+                                fontSize: 11, color: _kTextSub),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Tombol ganti file
+                    IconButton(
+                      onPressed: _pickFile,
+                      icon: const Icon(Icons.swap_horiz_rounded,
+                          color: _kAccent, size: 18),
+                      tooltip: 'Ganti file',
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.all(4),
+                    ),
+                    // Tombol hapus file
+                    IconButton(
+                      onPressed: () => setState(() => _file = null),
+                      icon: const Icon(Icons.close_rounded,
+                          color: _kColorDitolak, size: 18),
+                      tooltip: 'Hapus file',
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.all(4),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Batal', style: TextStyle(color: _kTextSub)),
+        ),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _kColorDiterima,
+            foregroundColor: Colors.white,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          onPressed: () => Navigator.pop(context, _TerimaResult(file: _file)),
+          icon: const Icon(Icons.check_rounded, size: 16),
+          label: const Text('Terima'),
+        ),
+      ],
     );
   }
 }
