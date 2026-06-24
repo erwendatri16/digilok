@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../user/pages/user_dashboard.dart';
 import '../../mentor/pages/mentor_dashboard.dart';
-import '../../admin/pages/admin_dashboard.dart';
 import 'register_page.dart';
 import '../../../core/widgets/popup_notification.dart';
 
@@ -89,7 +88,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
         // =========================================================
         // CEK STATUS AKUN — BLOKIR JIKA is_active = false
-        // Dicek paling awal sebelum apapun
         // =========================================================
         final bool isActive = data['is_active'] ?? true;
         if (!isActive) {
@@ -107,41 +105,22 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         }
 
         // =========================================================
-        // BLOKIR ADMIN JIKA LOGIN VIA HP (BUKAN WEB)
+        // BLOKIR JIKA MAINTENANCE AKTIF
+        // (Pengecualian admin telah dihapus)
         // =========================================================
-        if (userRole == 'admin' && !kIsWeb) {
+        final maintenance = await _isMaintenanceActive();
+        if (maintenance) {
           await Supabase.instance.client.auth.signOut();
           if (mounted) {
             setState(() => isLoading = false);
             PopupNotification.show(
               context: context,
-              type: PopupType.error,
-              title: "Akses Ditolak",
-              message: "Akun Admin wajib masuk via Web/Komputer!",
+              type: PopupType.maintenance,
+              title: "Sedang Pemeliharaan",
+              message: "Aplikasi sedang dalam pemeliharaan.\nCoba beberapa saat lagi.",
             );
           }
           return;
-        }
-
-        // =========================================================
-        // BLOKIR USER & MENTOR JIKA MAINTENANCE AKTIF
-        // Admin tetap bisa login
-        // =========================================================
-        if (userRole != 'admin') {
-          final maintenance = await _isMaintenanceActive();
-          if (maintenance) {
-            await Supabase.instance.client.auth.signOut();
-            if (mounted) {
-              setState(() => isLoading = false);
-              PopupNotification.show(
-                context: context,
-                type: PopupType.maintenance,
-                title: "Sedang Pemeliharaan",
-                message: "Aplikasi sedang dalam pemeliharaan.\nCoba beberapa saat lagi.",
-              );
-            }
-            return;
-          }
         }
 
         if (!mounted) return;
@@ -152,9 +131,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             break;
           case 'mentor':
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const MentorDashboard()));
-            break;
-          case 'admin':
-            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AdminDashboardPage()));
             break;
         }
       }
