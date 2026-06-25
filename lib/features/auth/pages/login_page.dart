@@ -106,7 +106,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
         // =========================================================
         // BLOKIR JIKA MAINTENANCE AKTIF
-        // (Pengecualian admin telah dihapus)
         // =========================================================
         final maintenance = await _isMaintenanceActive();
         if (maintenance) {
@@ -224,12 +223,16 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                 ),
                               ],
                             ),
-                            child: Image.asset(
-                              'lib/assets/logolock.png',
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Icon(Icons.book_rounded, size: 70, color: Color(0xFF4338CA));
-                              },
+                            child: ClipOval(
+                              child: Image.asset(
+                                'assets/icons/logo.jpeg', // ← PATH DIUBAH
+                                width: 100,
+                                height: 100,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Icon(Icons.book_rounded, size: 70, color: Color(0xFF4338CA));
+                                },
+                              ),
                             ),
                           ),
                         ),

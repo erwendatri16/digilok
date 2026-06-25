@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// ✅ FIX: Satu import saja — akses TableHelper via pw.TableHelper
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
@@ -48,12 +48,9 @@ class _LaporanPageState extends State<LaporanPage> {
 
       setState(() {
         totalLogbook    = logbookData.length;
-        pendingLogbook  =
-            logbookData.where((e) => e['status'] == 'pending').length;
-        approvedLogbook =
-            logbookData.where((e) => e['status'] == 'approved').length;
-        rejectedLogbook =
-            logbookData.where((e) => e['status'] == 'rejected').length;
+        pendingLogbook  = logbookData.where((e) => e['status'] == 'pending').length;
+        approvedLogbook = logbookData.where((e) => e['status'] == 'approved').length;
+        rejectedLogbook = logbookData.where((e) => e['status'] == 'rejected').length;
         totalHadirAbsen = absensiData.length;
         isLoading       = false;
       });
@@ -62,6 +59,12 @@ class _LaporanPageState extends State<LaporanPage> {
       setState(() => isLoading = false);
       debugPrint("loadData error: $e");
     }
+  }
+
+  // ================= LOAD IMAGE ASSET =================
+  Future<pw.MemoryImage> _loadImageAsset(String path) async {
+    final bytes = await rootBundle.load(path);
+    return pw.MemoryImage(bytes.buffer.asUint8List());
   }
 
   // ================= EXPORT PDF =================
@@ -78,6 +81,22 @@ class _LaporanPageState extends State<LaporanPage> {
 
       final now          = DateTime.now();
       final tanggalCetak = "${now.day}-${now.month}-${now.year}";
+
+      // ================= LOAD LOGO =================
+      pw.MemoryImage? logoBanjarmasin;
+      pw.MemoryImage? logoDigilok;
+
+      try {
+        logoBanjarmasin = await _loadImageAsset('assets/icons/logo_banjarmasin.png');
+      } catch (_) {
+        debugPrint("logo_banjarmasin.jpeg tidak ditemukan");
+      }
+
+      try {
+        logoDigilok = await _loadImageAsset('assets/icons/logo.jpeg');
+      } catch (_) {
+        debugPrint("logo.jpeg tidak ditemukan");
+      }
 
       String mentorName = "-";
       try {
@@ -110,37 +129,103 @@ class _LaporanPageState extends State<LaporanPage> {
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           build: (pdfContext) => [
-            pw.Center(
-              child: pw.Text(
-                "LAPORAN BULANAN MAGANG",
-                style: pw.TextStyle(
-                    fontSize: 18, fontWeight: pw.FontWeight.bold),
+
+            // ================= KOP SURAT =================
+            pw.Container(
+              decoration: const pw.BoxDecoration(
+                border: pw.Border(
+                  bottom: pw.BorderSide(width: 2, color: PdfColors.black),
+                ),
+              ),
+              padding: const pw.EdgeInsets.only(bottom: 10),
+              child: pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  // Logo kiri — Banjarmasin
+                  if (logoBanjarmasin != null)
+                    pw.Image(logoBanjarmasin, width: 60, height: 60)
+                  else
+                    pw.SizedBox(width: 60, height: 60),
+
+                  // Teks tengah
+                  pw.Expanded(
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.center,
+                      children: [
+                        pw.Text(
+                          "LAPORAN BULANAN MAGANG",
+                          style: pw.TextStyle(
+                            fontSize: 14,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                          textAlign: pw.TextAlign.center,
+                        ),
+                        pw.SizedBox(height: 4),
+                        pw.Text(
+                          "DIGILOK SYSTEM",
+                          style: pw.TextStyle(
+                            fontSize: 11,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.grey700,
+                          ),
+                          textAlign: pw.TextAlign.center,
+                        ),
+                        pw.SizedBox(height: 2),
+                        pw.Text(
+                          "Dinas Komunikasi Informatika dan Statistik",
+                          style: const pw.TextStyle(
+                            fontSize: 10,
+                            color: PdfColors.grey600,
+                          ),
+                          textAlign: pw.TextAlign.center,
+                        ),
+                        pw.Text(
+                          "Kota Banjarmasin",
+                          style: const pw.TextStyle(
+                            fontSize: 10,
+                            color: PdfColors.grey600,
+                          ),
+                          textAlign: pw.TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Logo kanan — DIGILOK
+                  if (logoDigilok != null)
+                    pw.Image(logoDigilok, width: 60, height: 60)
+                  else
+                    pw.SizedBox(width: 60, height: 60),
+                ],
               ),
             ),
-            pw.Center(child: pw.Text("DIGILOK SYSTEM")),
-            pw.Divider(),
+
+            pw.SizedBox(height: 12),
             pw.Text("Tanggal Cetak: $tanggalCetak"),
             pw.SizedBox(height: 15),
 
-            pw.Text("1. Ringkasan Aktivitas",
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
             pw.Text(
-                "Total Presensi Kehadiran: $totalHadirAbsen Hari"),
+              "1. Ringkasan Aktivitas",
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            ),
+            pw.Text("Total Presensi Kehadiran: $totalHadirAbsen Hari"),
             pw.Text(
-                "Total Pengajuan Logbook: $totalLogbook Kegiatan "
-                "($approvedLogbook Disetujui, $rejectedLogbook Ditolak, "
-                "$pendingLogbook Pending)"),
+              "Total Pengajuan Logbook: $totalLogbook Kegiatan "
+              "($approvedLogbook Disetujui, $rejectedLogbook Ditolak, "
+              "$pendingLogbook Pending)",
+            ),
             pw.SizedBox(height: 15),
 
-            pw.Text("2. Detail Logbook",
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              "2. Detail Logbook",
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            ),
             pw.SizedBox(height: 5),
 
             pw.TableHelper.fromTextArray(
-              headerStyle:
-                  pw.TextStyle(fontWeight: pw.FontWeight.bold),
-              headerDecoration:
-                  const pw.BoxDecoration(color: PdfColors.grey300),
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
               headers: ["Tanggal", "Judul", "Kategori", "Status"],
               data: logbookData
                   .map((e) => [
@@ -154,15 +239,15 @@ class _LaporanPageState extends State<LaporanPage> {
 
             pw.SizedBox(height: 20),
 
-            pw.Text("3. Detail Absensi",
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            pw.Text(
+              "3. Detail Absensi",
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            ),
             pw.SizedBox(height: 5),
 
             pw.TableHelper.fromTextArray(
-              headerStyle:
-                  pw.TextStyle(fontWeight: pw.FontWeight.bold),
-              headerDecoration:
-                  const pw.BoxDecoration(color: PdfColors.grey300),
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
               headers: ["Tanggal", "Jam Masuk", "Jam Pulang"],
               data: absensiData
                   .map((e) => [
@@ -182,9 +267,10 @@ class _LaporanPageState extends State<LaporanPage> {
                 children: [
                   pw.Text("Mengetahui,"),
                   pw.SizedBox(height: 50),
-                  pw.Text(mentorName,
-                      style: pw.TextStyle(
-                          fontWeight: pw.FontWeight.bold)),
+                  pw.Text(
+                    mentorName,
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  ),
                 ],
               ),
             ),
@@ -192,20 +278,18 @@ class _LaporanPageState extends State<LaporanPage> {
         ),
       );
 
-      await Printing.layoutPdf(
-          onLayout: (format) async => pdf.save());
-          
+      await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+
     } catch (e) {
       debugPrint("exportPDF error: $e");
-      
+
       if (!mounted) return;
-      
+
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text("Gagal export PDF: $e"),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ));
     } finally {
       if (mounted) {
@@ -259,27 +343,21 @@ class _LaporanPageState extends State<LaporanPage> {
                             ? null
                             : () async {
                                 if (user == null) return;
-                                
-                                // ✅ FIX BARU: Ambil messenger state sebelum memasuki celah asinkronus (async gap)
+
                                 final messenger = ScaffoldMessenger.of(context);
-                                
+
                                 try {
                                   final data = await Supabase
                                       .instance.client
                                       .from('logbook')
                                       .select()
                                       .eq('user_id', user.id)
-                                      .order('created_at',
-                                          ascending: false);
+                                      .order('created_at', ascending: false);
                                   await exportPDF(data);
                                 } catch (e) {
-                                  // ✅ FIX BARU: Cek menggunakan context.mounted bawaan BuildContext local closure
                                   if (!context.mounted) return;
-                                  
-                                  // Gunakan objek messenger yang sudah diekstrak dengan aman di atas
                                   messenger.showSnackBar(SnackBar(
-                                    content: Text(
-                                        "Gagal memuat data: $e"),
+                                    content: Text("Gagal memuat data: $e"),
                                     backgroundColor: Colors.red,
                                   ));
                                 }
@@ -289,18 +367,14 @@ class _LaporanPageState extends State<LaporanPage> {
                                 width: 18,
                                 height: 18,
                                 child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2),
+                                    color: Colors.white, strokeWidth: 2),
                               )
                             : const Icon(Icons.picture_as_pdf_rounded,
                                 color: Colors.white),
                         label: Text(
-                          isExporting
-                              ? "Membuat PDF..."
-                              : "Export PDF Sekarang",
+                          isExporting ? "Membuat PDF..." : "Export PDF Sekarang",
                           style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold),
+                              color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -309,29 +383,19 @@ class _LaporanPageState extends State<LaporanPage> {
 
                     // Statistik Logbook
                     const Text("Statistik Logbook",
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15)),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                     const SizedBox(height: 8),
 
                     Row(
                       children: [
-                        Expanded(
-                            child: _card("Total Buku",
-                                totalLogbook, Colors.blue)),
-                        Expanded(
-                            child: _card("Pending",
-                                pendingLogbook, Colors.orange)),
+                        Expanded(child: _card("Total Buku", totalLogbook, Colors.blue)),
+                        Expanded(child: _card("Pending", pendingLogbook, Colors.orange)),
                       ],
                     ),
                     Row(
                       children: [
-                        Expanded(
-                            child: _card("Disetujui",
-                                approvedLogbook, Colors.green)),
-                        Expanded(
-                            child: _card("Ditolak",
-                                rejectedLogbook, Colors.red)),
+                        Expanded(child: _card("Disetujui", approvedLogbook, Colors.green)),
+                        Expanded(child: _card("Ditolak", rejectedLogbook, Colors.red)),
                       ],
                     ),
 
@@ -339,18 +403,13 @@ class _LaporanPageState extends State<LaporanPage> {
 
                     // Statistik Kehadiran
                     const Text("Statistik Kehadiran",
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15)),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                     const SizedBox(height: 8),
 
                     Row(
                       children: [
                         Expanded(
-                          child: _card(
-                              "Total Kehadiran Absensi",
-                              totalHadirAbsen,
-                              Colors.teal),
+                          child: _card("Total Kehadiran Absensi", totalHadirAbsen, Colors.teal),
                         ),
                       ],
                     ),
@@ -384,9 +443,7 @@ class _LaporanPageState extends State<LaporanPage> {
           Text(
             value.toString(),
             style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 22,
-                color: color),
+                fontWeight: FontWeight.bold, fontSize: 22, color: color),
           ),
         ],
       ),

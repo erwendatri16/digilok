@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <application
-        android:label="aplikasi_digilok_final"
+        android:label="DIGILOK"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

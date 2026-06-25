@@ -112,11 +112,14 @@ class _SplashPageState extends State<SplashPage>
                         color: Colors.white.withValues(alpha: 0.15),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        Icons.menu_book_rounded,
-                        size: 58,
-                        color: Colors.white,
-                      ),
+                      child: ClipOval(
+  child: Image.asset(
+    'assets/icons/logo.jpeg',
+    width: 110,
+    height: 110,
+    fit: BoxFit.cover,
+  ),
+),
                     ),
 
                     const SizedBox(height: 28),

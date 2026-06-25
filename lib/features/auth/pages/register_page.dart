@@ -271,6 +271,7 @@ class _RegisterPageState extends State<RegisterPage> {
             child: Column(
               children: [
                 const SizedBox(height: 10),
+                // ===== LOGO =====
                 Center(
                   child: Container(
                     height: 85,
@@ -285,15 +286,19 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                       ],
                     ),
-                    child: Image.asset(
-                      'lib/assets/logolock.png',
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const CircleAvatar(
-                          backgroundColor: Colors.white,
-                          child: Icon(Icons.book_rounded, color: Color(0xFF4338CA), size: 40),
-                        );
-                      },
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/icons/logo.jpeg', // ← PATH DIUBAH
+                        width: 85,
+                        height: 85,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const CircleAvatar(
+                            backgroundColor: Colors.white,
+                            child: Icon(Icons.book_rounded, color: Color(0xFF4338CA), size: 40),
+                          );
+                        },
+                      ),
                     ),
                   ),
                 ),
@@ -301,8 +306,8 @@ class _RegisterPageState extends State<RegisterPage> {
                 const Text(
                   "DIGILOK",
                   style: TextStyle(
-                    color: Colors.white, 
-                    fontSize: 22, 
+                    color: Colors.white,
+                    fontSize: 22,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 3.0,
                   ),
@@ -326,8 +331,8 @@ class _RegisterPageState extends State<RegisterPage> {
                       const Text(
                         "Buat Akun",
                         style: TextStyle(
-                          fontSize: 18, 
-                          fontWeight: FontWeight.w900, 
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
                           color: Color(0xFF1E1B4B),
                           letterSpacing: 1.0,
                         ),
@@ -342,8 +347,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             selectedColor: const Color(0xFF4338CA),
                             disabledColor: Colors.grey[100],
                             labelStyle: TextStyle(
-                              fontWeight: FontWeight.bold, 
-                              color: role == "user" ? Colors.white : const Color(0xFF1E1B4B)
+                              fontWeight: FontWeight.bold,
+                              color: role == "user" ? Colors.white : const Color(0xFF1E1B4B),
                             ),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             onSelected: (_) => setState(() => role = "user"),
@@ -355,8 +360,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             selectedColor: const Color(0xFF4338CA),
                             disabledColor: Colors.grey[100],
                             labelStyle: TextStyle(
-                              fontWeight: FontWeight.bold, 
-                              color: role == "mentor" ? Colors.white : const Color(0xFF1E1B4B)
+                              fontWeight: FontWeight.bold,
+                              color: role == "mentor" ? Colors.white : const Color(0xFF1E1B4B),
                             ),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             onSelected: (_) => setState(() => role = "mentor"),
@@ -478,7 +483,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
                               )
                             : const Text(
-                                "Daftar Akun", 
+                                "Daftar Akun",
                                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 0.5),
                               ),
                       ),
@@ -491,8 +496,8 @@ class _RegisterPageState extends State<RegisterPage> {
                             color: Color(0xFF4338CA),
                             fontWeight: FontWeight.w700,
                             decoration: TextDecoration.underline,
-          ),
-        ),
+                          ),
+                        ),
                       ),
                     ],
                   ),
